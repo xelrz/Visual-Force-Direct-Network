@@ -1,1 +1,550 @@
 # Visual-Force-Direct-Network
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force-Directed Network</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            backdrop-filter: blur(10px);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .title {
+            text-align: center;
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 25px;
+            font-size: 15px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+        }
+        
+        label {
+            margin-bottom: 8px;
+            color: #495057;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        input[type="range"] {
+            width: 120px;
+            height: 8px;
+            border-radius: 4px;
+            background: #dee2e6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #2a5298;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.3);
+            accent-color: #2a5298;
+        }
+        
+        .button {
+            background: #2a5298;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .button:hover {
+            background: #1e3c72;
+            transform: translateY(-2px);
+        }
+        
+        .clusters-legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .cluster-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 18px;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+        }
+        
+        .cluster-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .simulation-stats {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #6c757d;
+            background: #e9ecef;
+            padding: 12px;
+            border-radius: 10px;
+        }
+        
+        .force-params {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 11px;
+            color: #868e96;
+        }
+        
+        #tooltip {
+            position: absolute;
+            padding: 15px;
+            background: rgba(30, 60, 114, 0.95);
+            color: white;
+            border-radius: 10px;
+            pointer-events: none;
+            opacity: 0;
+            font-size: 12px;
+            transition: opacity 0.3s;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            max-width: 200px;
+        }
+        
+        .node {
+            cursor: grab;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.2));
+        }
+        
+        .node:active {
+            cursor: grabbing;
+        }
+        
+        .node:hover {
+            filter: drop-shadow(0 5px 12px rgba(0,0,0,0.3));
+        }
+        
+        .link {
+            transition: all 0.3s ease;
+        }
+        
+        .node-label {
+            font-size: 14px;
+            font-weight: 700;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+        
+        .edge-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Force-Directed Network</h1>
+        <p class="subtitle">Physics-based layout yang otomatis mengelompokkan node berdasarkan jarak</p>
+        
+        <div class="clusters-legend">
+            <div class="cluster-item">
+                <div class="cluster-color" style="background: #e74c3c;"></div>
+                <span><strong>CIMANGLID</strong></span>
+            </div>
+            <div class="cluster-item">
+                <div class="cluster-color" style="background: #3498db;"></div>
+                <span><strong>CIBODAS</strong></span>
+            </div>
+            <div class="cluster-item">
+                <div class="cluster-color" style="background: #27ae60;"></div>
+                <span><strong>CILALAWI</strong></span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Link Strength</label>
+                <input type="range" id="linkStrength" min="0.1" max="2" step="0.1" value="0.8">
+            </div>
+            <div class="control-group">
+                <label>Charge Force</label>
+                <input type="range" id="chargeForce" min="-500" max="-50" step="25" value="-200">
+            </div>
+            <div class="control-group">
+                <label>Center Force</label>
+                <input type="range" id="centerForce" min="0.01" max="0.3" step="0.01" value="0.1">
+            </div>
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showWeights" checked>
+                    Edge Weights
+                </label>
+            </div>
+            <div class="control-group">
+                <button class="button" id="restartBtn">Restart Simulation</button>
+            </div>
+        </div>
+        
+        <div class="simulation-stats">
+            <div><strong>Physics Simulation:</strong> <span id="alphaValue">1.000</span> | <span id="nodeCount">7</span> nodes, <span id="edgeCount">11</span> edges</div>
+            <div class="force-params">
+                <span>Link Distance: Proportional to actual distance</span> • 
+                <span>Node Repulsion: Prevents overlap</span> • 
+                <span>Centering: Keeps network centered</span>
+            </div>
+        </div>
+        
+        <svg id="network"></svg>
+    </div>
+    
+    <div id="tooltip"></div>
+
+    <script>
+        // Data actual
+        const clusterColors = {
+            "CIMANGLID": "#e74c3c",
+            "CIBODAS": "#3498db", 
+            "CILALAWI": "#27ae60"
+        };
+
+        const nodes = [
+            {id: "A", cluster: "CIMANGLID", degree: 2},
+            {id: "B", cluster: "CIMANGLID", degree: 5}, // Super hub
+            {id: "C", cluster: "CIMANGLID", degree: 3},
+            {id: "D", cluster: "CIMANGLID", degree: 2},
+            {id: "E", cluster: "CIBODAS", degree: 4},
+            {id: "F", cluster: "CILALAWI", degree: 4},
+            {id: "G", cluster: "CIBODAS", degree: 2}
+        ];
+
+        const links = [
+            {source: "A", target: "B", distance: 100},
+            {source: "A", target: "D", distance: 240},
+            {source: "B", target: "C", distance: 250},
+            {source: "B", target: "D", distance: 180},
+            {source: "B", target: "E", distance: 1400},
+            {source: "B", target: "F", distance: 2100},
+            {source: "C", target: "E", distance: 1300},
+            {source: "C", target: "F", distance: 1900},
+            {source: "E", target: "F", distance: 1700},
+            {source: "E", target: "G", distance: 1400},
+            {source: "F", target: "G", distance: 2300}
+        ];
+
+        // Setup SVG
+        const width = 900;
+        const height = 600;
+        const svg = d3.select("#network")
+            .attr("width", width)
+            .attr("height", height);
+
+        const g = svg.append("g");
+        
+        // Tooltip
+        const tooltip = d3.select("#tooltip");
+
+        // Controls
+        const linkStrengthSlider = d3.select("#linkStrength");
+        const chargeForceSlider = d3.select("#chargeForce");
+        const centerForceSlider = d3.select("#centerForce");
+        const showWeights = d3.select("#showWeights");
+        const restartBtn = d3.select("#restartBtn");
+
+        // Distance scale for link distance (scale down real distances)
+        const distanceScale = d3.scaleLinear()
+            .domain([100, 2300])
+            .range([30, 180]);
+
+        function getEdgeColor(distance) {
+            if (distance <= 250) return "#2ecc71";
+            if (distance <= 1700) return "#f39c12";
+            return "#e74c3c";
+        }
+
+        function getEdgeWidth(distance) {
+            if (distance <= 250) return 3;
+            if (distance <= 1700) return 5;
+            return 7;
+        }
+
+        let simulation;
+        let nodeElements, linkElements, labelElements;
+
+        function initializeSimulation() {
+            const linkStrength = +linkStrengthSlider.property("value");
+            const chargeForce = +chargeForceSlider.property("value");
+            const centerForce = +centerForceSlider.property("value");
+
+            // Clear previous
+            g.selectAll("*").remove();
+
+            // Create force simulation
+            simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links)
+                    .id(d => d.id)
+                    .distance(d => distanceScale(d.distance))
+                    .strength(linkStrength))
+                .force("charge", d3.forceManyBody()
+                    .strength(chargeForce))
+                .force("center", d3.forceCenter(width / 2, height / 2)
+                    .strength(centerForce))
+                .force("collision", d3.forceCollide()
+                    .radius(d => (d.degree === 5 ? 25 : d.degree >= 4 ? 20 : 18)))
+                .on("tick", ticked);
+
+            // Create link elements
+            linkElements = g.selectAll(".link")
+                .data(links)
+                .enter()
+                .append("g")
+                .attr("class", "link");
+
+            linkElements.append("line")
+                .attr("stroke", d => getEdgeColor(d.distance))
+                .attr("stroke-width", d => getEdgeWidth(d.distance))
+                .attr("opacity", 0.8)
+                .on("mouseover", function(event, d) {
+                    const sourceCluster = nodes.find(n => n.id === d.source.id).cluster;
+                    const targetCluster = nodes.find(n => n.id === d.target.id).cluster;
+                    const connectionType = sourceCluster === targetCluster ? "Intra-cluster" : "Inter-cluster";
+                    
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${d.source.id} ↔ ${d.target.id}</strong><br/>
+                               Distance: ${d.distance}m<br/>
+                               Type: ${connectionType}<br/>
+                               Force Distance: ${Math.round(distanceScale(d.distance))}px`)
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                    
+                    d3.select(this).select("line")
+                        .attr("opacity", 1)
+                        .attr("stroke-width", d => getEdgeWidth(d.distance) + 2);
+                })
+                .on("mouseout", function(event, d) {
+                    tooltip.style("opacity", 0);
+                    d3.select(this).select("line")
+                        .attr("opacity", 0.8)
+                        .attr("stroke-width", d => getEdgeWidth(d.distance));
+                });
+
+            // Create node elements
+            nodeElements = g.selectAll(".node")
+                .data(nodes)
+                .enter()
+                .append("circle")
+                .attr("class", "node")
+                .attr("r", d => d.degree === 5 ? 22 : d.degree >= 4 ? 18 : 15)
+                .attr("fill", d => clusterColors[d.cluster])
+                .attr("stroke", d => d.degree === 5 ? "#f39c12" : d.degree >= 4 ? "#f1c40f" : "#2c3e50")
+                .attr("stroke-width", d => d.degree >= 4 ? 4 : 3)
+                .call(drag(simulation))
+                .on("mouseover", function(event, d) {
+                    const connectedNodes = links
+                        .filter(l => l.source.id === d.id || l.target.id === d.id)
+                        .map(l => l.source.id === d.id ? l.target.id : l.source.id);
+                    
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>Node ${d.id}</strong><br/>
+                               Cluster: ${d.cluster}<br/>
+                               Degree: ${d.degree}<br/>
+                               Connected to: ${connectedNodes.join(', ')}<br/>
+                               ${d.degree === 5 ? '<em>Super Hub!</em>' : d.degree >= 4 ? '<em>Bridge Node</em>' : ''}`)
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                    
+                    // Highlight connected elements
+                    linkElements.select("line")
+                        .attr("opacity", l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.2);
+                    
+                    nodeElements
+                        .attr("opacity", n => n.id === d.id || connectedNodes.includes(n.id) ? 1 : 0.3);
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                    linkElements.select("line").attr("opacity", 0.8);
+                    nodeElements.attr("opacity", 1);
+                });
+
+            // Node labels
+            labelElements = g.selectAll(".node-label")
+                .data(nodes)
+                .enter()
+                .append("text")
+                .attr("class", "node-label")
+                .attr("fill", "white")
+                .text(d => d.id);
+
+            // Update alpha display
+            simulation.on("tick", () => {
+                d3.select("#alphaValue").text(simulation.alpha().toFixed(3));
+                ticked();
+            });
+        }
+
+        function ticked() {
+            linkElements.select("line")
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            nodeElements
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            labelElements
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + 1);
+
+            // Edge labels
+            if (showWeights.property("checked")) {
+                updateEdgeLabels();
+            } else {
+                g.selectAll(".edge-label").remove();
+            }
+        }
+
+        function updateEdgeLabels() {
+            const edgeLabels = g.selectAll(".edge-label")
+                .data(links);
+            
+            edgeLabels.enter()
+                .append("text")
+                .attr("class", "edge-label")
+                .attr("fill", "#2c3e50")
+                .attr("stroke", "white")
+                .attr("stroke-width", "3")
+                .attr("paint-order", "stroke")
+                .attr("font-weight", "bold")
+                .merge(edgeLabels)
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => (d.source.y + d.target.y) / 2)
+                .text(d => d.distance + "m");
+            
+            edgeLabels.exit().remove();
+        }
+
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+
+        // Event listeners
+        linkStrengthSlider.on("input", () => {
+            simulation.force("link").strength(+linkStrengthSlider.property("value"));
+            simulation.alpha(1).restart();
+        });
+
+        chargeForceSlider.on("input", () => {
+            simulation.force("charge").strength(+chargeForceSlider.property("value"));
+            simulation.alpha(1).restart();
+        });
+
+        centerForceSlider.on("input", () => {
+            simulation.force("center").strength(+centerForceSlider.property("value"));
+            simulation.alpha(1).restart();
+        });
+
+        showWeights.on("change", ticked);
+
+        restartBtn.on("click", () => {
+            simulation.alpha(1).restart();
+        });
+
+        // Initialize
+        initializeSimulation();
+        
+        // Entrance animation
+        svg.style("opacity", 0)
+            .transition()
+            .duration(1000)
+            .style("opacity", 1);
+    </script>
+</body>
+</html>
+buat kode html ini jadi link yang bisa langsung terbuka di web
